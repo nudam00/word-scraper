@@ -33,8 +33,9 @@ func TestSortWords(t *testing.T) {
 		"f": 22,
 	}
 
-	max = 6
-	words := sortWords(data)
+	s := Scraper{MaxOuput: 6}
+
+	words := s.sortWords(data)
 	expected := []Word{
 		{Text: "f", Count: 22},
 		{Text: "d", Count: 15},
@@ -45,8 +46,9 @@ func TestSortWords(t *testing.T) {
 	}
 	assert.Equal(t, expected, words, "error sorting words")
 
-	max = 1
-	words = sortWords(data)
+	s = Scraper{MaxOuput: 1}
+
+	words = s.sortWords(data)
 	expected = []Word{
 		{Text: "f", Count: 22},
 	}
@@ -54,18 +56,15 @@ func TestSortWords(t *testing.T) {
 }
 
 func TestScrapePage_WrongUrl(t *testing.T) {
-	client = &http.Client{}
-	scraper := Scraper{}
+	scraper := Scraper{Client: &http.Client{}}
 	url := ".com"
 	_, err := scraper.scrapePage(url)
 	assert.NotNil(t, err)
 }
 
 func TestScrapePage(t *testing.T) {
-	scraper := Scraper{}
+	scraper := Scraper{Client: &http.Client{}, MaxOuput: 20, Re: regexp.MustCompile(`[^\p{L}\p{N} ]+`)}
 
-	max = 20
-	re = regexp.MustCompile(`[^\p{L}\p{N} ]+`)
 	url := "https://websensa.com/en/back-end-developer-2/"
 	pageData, err := scraper.scrapePage(url)
 	assert.Nil(t, err)
@@ -76,7 +75,7 @@ func TestScrapePage(t *testing.T) {
 	}
 	assert.NotEmpty(t, pageData)
 
-	re = regexp.MustCompile(`[^\p{L} ]+`)
+	scraper = Scraper{Client: &http.Client{}, MaxOuput: 20, Re: regexp.MustCompile(`[^\p{L} ]+`)}
 	pageData, err = scraper.scrapePage(url)
 	assert.Nil(t, err)
 	for _, word := range pageData.Words {
@@ -89,26 +88,27 @@ func TestScrapePage(t *testing.T) {
 }
 
 func TestDoScrape(t *testing.T) {
-	scraper := Scraper{}
 	urls := []string{"https://websensa.com/en/back-end-developer-2/"}
 	max := 5
 	conc := 1
 	numb := true
-	pageData := scraper.DoScrape(urls, max, conc, numb)
+	scraper := Scraper{Urls: urls, MaxOuput: max, Concurrency: conc, IfNumIncl: numb}
+	pageData := scraper.DoScrape()
 	assert.NotEmpty(t, pageData)
 
 	numb = false
-	pageData = scraper.DoScrape(urls, max, conc, numb)
+	scraper = Scraper{Urls: urls, MaxOuput: max, Concurrency: conc, IfNumIncl: numb}
+	pageData = scraper.DoScrape()
 	assert.NotEmpty(t, pageData)
 }
 
 func TestDoScrape_DuplicatePage(t *testing.T) {
-	scraper := Scraper{}
 	urls := []string{"https://websensa.com/en/back-end-developer-2/", "https://websensa.com/en/back-end-developer-2/"}
 	max := 5
 	conc := 2
 	numb := true
-	pageData := scraper.DoScrape(urls, max, conc, numb)
+	scraper := Scraper{Urls: urls, MaxOuput: max, Concurrency: conc, IfNumIncl: numb}
+	pageData := scraper.DoScrape()
 	assert.NotEmpty(t, pageData)
 
 	count := 0
@@ -127,12 +127,12 @@ func TestDoScrape_WrongPage(t *testing.T) {
 		log.SetOutput(os.Stderr)
 	}()
 
-	scraper := Scraper{}
 	urls := []string{".com"}
 	max := 5
 	conc := 1
 	numb := true
-	pageData := scraper.DoScrape(urls, max, conc, numb)
+	scraper := Scraper{Urls: urls, MaxOuput: max, Concurrency: conc, IfNumIncl: numb}
+	pageData := scraper.DoScrape()
 	assert.Empty(t, pageData)
 
 	assert.Contains(t, buf.String(), string(`Site .com: Get ".com": unsupported protocol scheme ""`))
@@ -143,12 +143,15 @@ func TestSaveToJson(t *testing.T) {
 	assert.Nil(t, err)
 	defer os.Remove(f.Name())
 
-	scraper := Scraper{PagesData: []PageData{
+	scraper := Scraper{Saver: &JsonSaver{}, PagesData: []PageData{
 		{Url: "x.com", Words: []Word{
 			{Text: "a", Count: 1},
 		}},
 	}}
-	err = scraper.SaveToJson(f.Name())
+	err = scraper.Saver.SaveToJson([]PageData{
+		{Url: "x.com", Words: []Word{
+			{Text: "a", Count: 1},
+		}}}, f.Name())
 	assert.Nil(t, err)
 
 	fileData, err := os.ReadFile(f.Name())
@@ -162,7 +165,7 @@ func TestSaveToJson(t *testing.T) {
 }
 
 func TestSaveToJson_WrongPath(t *testing.T) {
-	scraper := Scraper{}
-	err := scraper.SaveToJson("//X")
+	scraper := Scraper{Saver: &JsonSaver{}}
+	err := scraper.Saver.SaveToJson([]PageData{}, "//X")
 	assert.NotNil(t, err)
 }

@@ -22,11 +22,21 @@ var (
 	max         = 20
 	concurrency = 5
 	numbers     = false
+	userAgent   = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+	accept      = "text/html"
 )
 
 func main() {
-	scraper := &s.Scraper{}
-	pagesData := scraper.DoScrape(sites, max, concurrency, numbers)
+	scraper := &s.Scraper{
+		Saver:       &s.JsonSaver{},
+		Urls:        sites,
+		MaxOuput:    max,
+		Concurrency: concurrency,
+		IfNumIncl:   numbers,
+		UserAgent:   userAgent,
+		Accept:      accept}
+
+	pagesData := scraper.DoScrape()
 
 	for _, pageData := range pagesData {
 		fmt.Println("Site:", pageData.Url)
@@ -35,7 +45,7 @@ func main() {
 		}
 	}
 
-	err := scraper.SaveToJson("./data/example_data.json")
+	err := scraper.Saver.SaveToJson(pagesData, "./data/example_data.json")
 	if err != nil {
 		log.Println(err)
 	}
